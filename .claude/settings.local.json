@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --yes)",
+      "Bash(npx create-next-app@latest sprintplanning-tmp --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --yes)",
+      "Bash(shopt -s dotglob)",
+      "Bash(mv /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/sprintplanning-tmp/* /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/)",
+      "Bash(rmdir /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/sprintplanning-tmp)",
+      "Bash(bash -c \"shopt -s dotglob && mv /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/sprintplanning-tmp/* /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/ && rmdir /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/sprintplanning-tmp\")",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init --defaults --yes)"
+    ]
+  }
+}
