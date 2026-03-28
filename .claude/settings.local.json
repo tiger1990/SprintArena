@@ -9,7 +9,17 @@
       "Bash(rmdir /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/sprintplanning-tmp)",
       "Bash(bash -c \"shopt -s dotglob && mv /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/sprintplanning-tmp/* /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/ && rmdir /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/sprintplanning-tmp\")",
       "Bash(npm install:*)",
-      "Bash(npx shadcn@latest init --defaults --yes)"
+      "Bash(npx shadcn@latest init --defaults --yes)",
+      "Bash(npx shadcn@latest add button card dialog dropdown-menu select toast tooltip progress avatar separator tabs scroll-area badge textarea input label alert popover sheet --yes)",
+      "Bash(npx shadcn@latest add button card dialog dropdown-menu select sonner tooltip progress avatar separator tabs scroll-area badge textarea input label alert popover sheet --yes)",
+      "Bash(node -e \"const p=require\\(''/Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/package.json''\\); console.log\\(JSON.stringify\\({deps:Object.keys\\(p.dependencies||{}\\), devDeps:Object.keys\\(p.devDependencies||{}\\)}, null, 2\\)\\)\")",
+      "Bash(ls /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/src/app/\\\\\\(app\\\\\\)/)",
+      "Bash(ls /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/src/app/\\\\\\(app\\\\\\)/sprints/)",
+      "Bash(ls /Users/deepakpanwar/Documents/AI_Projects/SprintPlanning/src/app/\\\\\\(app\\\\\\)/sprints/[id]/)",
+      "Bash(npm run:*)",
+      "Bash(npx playwright:*)",
+      "Skill(code-review:code-review)",
+      "Skill(code-review:code-review:*)"
     ]
   }
 }
