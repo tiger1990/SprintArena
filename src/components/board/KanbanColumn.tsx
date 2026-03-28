@@ -77,8 +77,7 @@ export function KanbanColumn({ id, title, stories, count, onAddStory }: KanbanCo
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      flex: '1 1 0',
-      minWidth: '220px',
+      width: '100%',
       borderRadius: R.xl,
       border: `1px solid ${isOver ? `${C.accent.DEFAULT}66` : C.border.DEFAULT}`,
       borderTop: `2px solid ${isOver ? C.accent.DEFAULT : cfg.topColor}`,
@@ -134,13 +133,11 @@ export function KanbanColumn({ id, title, stories, count, onAddStory }: KanbanCo
       <div
         ref={setNodeRef}
         style={{
-          flex: 1,
           padding: SP[3],
           display: 'flex',
           flexDirection: 'column',
           gap: SP[2.5],
           minHeight: '200px',
-          overflowY: 'auto',
         }}
       >
         <SortableContext items={stories.map(s => s.id)} strategy={verticalListSortingStrategy}>

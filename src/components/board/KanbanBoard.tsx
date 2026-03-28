@@ -43,8 +43,19 @@ export function KanbanBoard({ sprint }: { sprint: Sprint }) {
       return
     }
 
-    const newStatus = over.id as StoryStatus
-    if (COLUMN_STATUSES.includes(newStatus) && newStatus !== story.status) {
+    // over.id is either a column status (dropped on empty column space)
+    // or a story id (dropped on top of another card via SortableContext).
+    // Resolve both cases to a target column status.
+    let newStatus: StoryStatus
+    if (COLUMN_STATUSES.includes(over.id as StoryStatus)) {
+      newStatus = over.id as StoryStatus
+    } else {
+      const overStory = sprintStories.find(s => s.id === over.id)
+      if (!overStory) return
+      newStatus = overStory.status
+    }
+
+    if (newStatus !== story.status) {
       moveStory(story.id, newStatus, currentUser.id)
       toast.success(`Moved to ${STATUS_LABELS[newStatus]}`)
     }
@@ -58,21 +69,18 @@ export function KanbanBoard({ sprint }: { sprint: Sprint }) {
 
   return (
     <div style={{
-      flex: 1,
       padding: `0 ${SP[6]} ${SP[6]}`,
       overflowX: 'auto',
-      overflowY: 'hidden',
     }}>
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div style={{
           display: 'flex',
           gap: SP[3],
-          height: '100%',
-          minHeight: '500px',
           minWidth: 'max-content',
+          alignItems: 'flex-start',
         }}>
           {columns.map(col => (
-            <div key={col.status} style={{ flex: '1 1 0', minWidth: '220px', maxWidth: '320px', display: 'flex' }}>
+            <div key={col.status} style={{ flex: '1 1 260px', minWidth: '220px', maxWidth: '320px' }}>
               <KanbanColumn
                 id={col.status}
                 title={col.title}

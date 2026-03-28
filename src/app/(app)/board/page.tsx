@@ -12,7 +12,7 @@ export default function BoardPage() {
   const { isAdmin } = useCurrentUser()
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
 
       {/* ── Page header ────────────────────────────────────────────────── */}
       <div style={{ padding: `${SP[6]} ${SP[6]} ${SP[4]}`, flexShrink: 0 }}>
