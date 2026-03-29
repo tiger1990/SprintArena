@@ -1,0 +1,882 @@
+# Profile Screen Redesign Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Redesign `src/app/(app)/profile/[id]/page.tsx` to match `ProfileScreen.png` using the design-system token pattern established in `team/page.tsx`.
+
+**Architecture:** Single file rewrite with internal helper components (HeroCard, StatCard, AchievementsSection, AchievementCard, SprintHistorySection, HistoryRow). All styles via `useTheme()` inline tokens — no raw hex or Tailwind color classes.
+
+**Tech Stack:** Next.js App Router, React, Zustand, design-system tokens (`@/design-system`), Lucide React icons.
+
+**Spec:** `docs/superpowers/specs/2026-03-29-profile-screen-redesign.md`
+
+---
+
+## File Map
+
+| Action | Path | Responsibility |
+|--------|------|----------------|
+| Modify | `src/app/(app)/profile/[id]/page.tsx` | Full profile UI — hero, stats, achievements, sprint history |
+| Read only | `src/hooks/useTheme.ts` | Token access pattern |
+| Read only | `src/app/(app)/team/page.tsx` | Reference for inline-style pattern |
+| Read only | `src/types/index.ts` | `User`, `BADGES`, `SprintResult`, `Badge` types |
+| Read only | `src/components/shared/Avatar.tsx` | Existing Avatar (kept circular; hero uses inline rectangular variant) |
+
+---
+
+## Task 1: Skeleton — imports, data derivation, page shell
+
+**Files:**
+- Modify: `src/app/(app)/profile/[id]/page.tsx`
+
+- [ ] **Step 1: Replace the file with the new skeleton**
+
+Replace the entire contents of `src/app/(app)/profile/[id]/page.tsx` with:
+
+```tsx
+'use client'
+import { useParams } from 'next/navigation'
+import { useAppStore } from '@/store/app.store'
+import { useTheme } from '@/hooks/useTheme'
+import { BADGES } from '@/types'
+import type { User, SprintResult, Badge, Sprint } from '@/types'
+import {
+  Trophy, CheckCircle2, Zap, Target,
+  MapPin, Share2, Pencil,
+} from 'lucide-react'
+
+export default function ProfilePage() {
+  const { colors: C, typography: TY, spacing: SP, radius: R, transitions } = useTheme()
+  const params = useParams()
+  const { users, sprintResults, userBadges, sprints, currentUser } = useAppStore()
+
+  const user = users.find(u => u.id === params.id)
+  if (!user) {
+    return (
+      <div style={{ padding: SP[6], color: C.text.secondary, fontSize: TY.fontSize.sm }}>
+        User not found.
+      </div>
+    )
+  }
+
+  const results      = sprintResults.filter(r => r.userId === user.id)
+  const badges       = userBadges.filter(b => b.userId === user.id)
+  const wins         = results.filter(r => r.isWinner).length
+  const totalStories = results.reduce((s, r) => s + r.storiesCompleted, 0)
+  const totalPoints  = results.reduce((s, r) => s + r.pointsScored, 0)
+  const avgOnTime    = results.length > 0
+    ? Math.round(results.reduce((s, r) => s + r.onTimeRate, 0) / results.length * 100)
+    : 0
+  const earnedBadgeKeys = new Set(badges.map(b => b.badgeKey))
+  const isOwnProfile = user.id === currentUser?.id
+
+  return (
+    <div style={{ padding: SP[6], maxWidth: '860px' }}>
+      <p>Skeleton — sections coming in subsequent tasks</p>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 2: Verify the page renders without errors**
+
+Run: `npm run dev`
+Navigate to `/profile/<any-user-id>`. Expected: "Skeleton — sections coming in subsequent tasks" renders without console errors.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/app/\(app\)/profile/\[id\]/page.tsx
+git commit -m "feat(profile): skeleton with imports and data derivation"
+```
+
+---
+
+## Task 2: Profile Hero Card
+
+**Files:**
+- Modify: `src/app/(app)/profile/[id]/page.tsx`
+
+- [ ] **Step 1: Add the `HeroCard` helper below the default export and wire it into the JSX**
+
+Add this function at the bottom of the file (after `ProfilePage`):
+
+```tsx
+function HeroCard({
+  user, wins, isOwnProfile, C, TY, SP, R, transitions,
+}: {
+  user: User
+  wins: number
+  isOwnProfile: boolean
+  C: any; TY: any; SP: any; R: any; transitions: any
+}) {
+  const roleLabel = user.role === 'admin' ? 'System Administrator' : 'Assignee'
+
+  return (
+    <div style={{
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R['2xl'],
+      padding: SP[6],
+      marginBottom: SP[5],
+      display: 'flex',
+      gap: SP[6],
+      alignItems: 'flex-start',
+      flexWrap: 'wrap',
+    }}>
+      {/* ── Rectangular hero avatar ── */}
+      {user.photoUrl ? (
+        <img
+          src={user.photoUrl}
+          alt={user.name}
+          style={{
+            width: '88px',
+            height: '104px',
+            borderRadius: R['2xl'],
+            objectFit: 'cover',
+            flexShrink: 0,
+          }}
+        />
+      ) : (
+        <div style={{
+          width: '88px',
+          height: '104px',
+          borderRadius: R['2xl'],
+          backgroundColor: user.color,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: TY.fontSize['3xl'],
+          fontWeight: TY.fontWeight.bold,
+          color: '#fff',
+          flexShrink: 0,
+          fontFamily: TY.fontFamily.headline,
+        }}>
+          {user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+        </div>
+      )}
+
+      {/* ── Identity block ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Role label */}
+        <p style={{
+          fontSize: TY.fontSize['2xs'],
+          fontWeight: TY.fontWeight.bold,
+          letterSpacing: TY.letterSpacing.wider,
+          textTransform: 'uppercase' as const,
+          color: C.accent.DEFAULT,
+          margin: `0 0 ${SP[1.5]} 0`,
+        }}>
+          {roleLabel}
+        </p>
+
+        {/* Name */}
+        <h1 className="headline-font" style={{
+          fontSize: TY.fontSize['3xl'],
+          fontWeight: TY.fontWeight.bold,
+          color: C.text.primary,
+          letterSpacing: TY.letterSpacing.tight,
+          lineHeight: TY.lineHeight.tight,
+          margin: `0 0 ${SP[3]} 0`,
+        }}>
+          {user.name}
+        </h1>
+
+        {/* Status + location row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: SP[3],
+          flexWrap: 'wrap' as const,
+          marginBottom: SP[4],
+        }}>
+          {/* Online dot */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: SP[1.5] }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: R.full,
+              backgroundColor: C.success,
+              boxShadow: `0 0 6px ${C.success}`,
+            }} />
+            <span style={{ fontSize: TY.fontSize.xs, color: C.text.secondary }}>Online</span>
+          </div>
+
+          <span style={{ color: C.border.strong, fontSize: TY.fontSize.xs }}>·</span>
+
+          {/* Location (timezone) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: SP[1] }}>
+            <MapPin size={12} color={C.text.secondary} />
+            <span style={{ fontSize: TY.fontSize.xs, color: C.text.secondary }}>
+              {user.timezone}
+            </span>
+          </div>
+        </div>
+
+        {/* Action buttons — own profile only */}
+        {isOwnProfile && (
+          <div style={{ display: 'flex', gap: SP[3], flexWrap: 'wrap' as const }}>
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: SP[2],
+              padding: `${SP[2]} ${SP[4]}`,
+              borderRadius: R.lg,
+              border: `1px solid ${C.border.strong}`,
+              backgroundColor: 'transparent',
+              color: C.text.primary,
+              fontSize: TY.fontSize.sm,
+              fontWeight: TY.fontWeight.semibold,
+              cursor: 'pointer',
+              transition: `all ${transitions.fast}`,
+            }}>
+              <Pencil size={14} />
+              Edit Profile
+            </button>
+
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: SP[2],
+              padding: `${SP[2]} ${SP[4]}`,
+              borderRadius: R.lg,
+              border: `1px solid ${C.accent.DEFAULT}`,
+              backgroundColor: C.accent.bgSubtle,
+              color: C.accent.DEFAULT,
+              fontSize: TY.fontSize.sm,
+              fontWeight: TY.fontWeight.semibold,
+              cursor: 'pointer',
+              transition: `all ${transitions.fast}`,
+            }}>
+              <Share2 size={14} />
+              Share Stats
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+```
+
+Then update the `return` block inside `ProfilePage` to use it:
+
+```tsx
+  return (
+    <div style={{ padding: SP[6], maxWidth: '860px' }}>
+      <HeroCard
+        user={user}
+        wins={wins}
+        isOwnProfile={isOwnProfile}
+        C={C} TY={TY} SP={SP} R={R} transitions={transitions}
+      />
+    </div>
+  )
+```
+
+- [ ] **Step 2: Verify hero card renders correctly**
+
+Navigate to `/profile/<user-id>`. Expected:
+- Rectangular avatar (or initials block) with rounded corners
+- Role label in small purple uppercase above name
+- Name in large headline font
+- Green Online dot + timezone text
+- Edit Profile + Share Stats buttons if viewing own profile; no buttons on other profiles
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/app/\(app\)/profile/\[id\]/page.tsx
+git commit -m "feat(profile): hero card with rectangular avatar, role label, status, actions"
+```
+
+---
+
+## Task 3: Stats Row
+
+**Files:**
+- Modify: `src/app/(app)/profile/[id]/page.tsx`
+
+- [ ] **Step 1: Add `StatCard` helper and the stats row to `ProfilePage`**
+
+Add this helper function at the bottom of the file:
+
+```tsx
+function StatCard({
+  label, value, subLabel, icon: Icon, iconColor,
+  C, TY, SP, R,
+}: {
+  label: string
+  value: string | number
+  subLabel: string
+  icon: React.ElementType
+  iconColor: string
+  C: any; TY: any; SP: any; R: any
+}) {
+  return (
+    <div style={{
+      flex: '1 1 160px',
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R.xl,
+      padding: SP[5],
+    }}>
+      {/* Label + icon row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: SP[3],
+      }}>
+        <span style={{
+          fontSize: TY.fontSize['2xs'],
+          fontWeight: TY.fontWeight.bold,
+          letterSpacing: TY.letterSpacing.wider,
+          textTransform: 'uppercase' as const,
+          color: C.text.disabled,
+        }}>
+          {label}
+        </span>
+        <Icon size={14} color={iconColor} />
+      </div>
+
+      {/* Big number */}
+      <p className="headline-font" style={{
+        fontSize: TY.fontSize['2xl'],
+        fontWeight: TY.fontWeight.bold,
+        color: C.text.primary,
+        margin: `0 0 ${SP[1]} 0`,
+        lineHeight: 1,
+      }}>
+        {value}
+      </p>
+
+      {/* Sub-label */}
+      <p style={{
+        fontSize: TY.fontSize['2xs'],
+        color: C.text.disabled,
+        margin: 0,
+      }}>
+        {subLabel}
+      </p>
+    </div>
+  )
+}
+```
+
+Update `ProfilePage` return to include the stats row after HeroCard:
+
+```tsx
+  return (
+    <div style={{ padding: SP[6], maxWidth: '860px' }}>
+      <HeroCard
+        user={user}
+        wins={wins}
+        isOwnProfile={isOwnProfile}
+        C={C} TY={TY} SP={SP} R={R} transitions={transitions}
+      />
+
+      {/* Stats Row */}
+      <div style={{
+        display: 'flex',
+        gap: SP[4],
+        flexWrap: 'wrap',
+        marginBottom: SP[5],
+      }}>
+        <StatCard
+          label="Sprints Won"
+          value={wins}
+          subLabel={`${wins} / ${results.length} total`}
+          icon={Trophy}
+          iconColor={C.warning}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="Stories Done"
+          value={totalStories}
+          subLabel="Completed"
+          icon={CheckCircle2}
+          iconColor={C.success}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="Total Points"
+          value={Math.round(totalPoints)}
+          subLabel="XP Gained"
+          icon={Zap}
+          iconColor={C.accent.DEFAULT}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="On-Time Rate"
+          value={`${avgOnTime}%`}
+          subLabel="Precision"
+          icon={Target}
+          iconColor={C.palette.primaryFixedDim}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+      </div>
+    </div>
+  )
+```
+
+- [ ] **Step 2: Verify stats row**
+
+Expected: 4 cards in a horizontal row, each with small uppercase label + icon at top, large number, sub-label. Wraps to 2 columns on narrow viewports.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/app/\(app\)/profile/\[id\]/page.tsx
+git commit -m "feat(profile): stats row with Lucide icons and design-system tokens"
+```
+
+---
+
+## Task 4: Achievements Section
+
+**Files:**
+- Modify: `src/app/(app)/profile/[id]/page.tsx`
+
+- [ ] **Step 1: Add `AchievementCard` and `AchievementsSection` helpers**
+
+Add these at the bottom of the file:
+
+```tsx
+function AchievementCard({
+  badge, earned, sprintName,
+  C, TY, SP, R,
+}: {
+  badge: Badge
+  earned: boolean
+  sprintName?: string
+  C: any; TY: any; SP: any; R: any
+}) {
+  return (
+    <div style={{
+      padding: SP[4],
+      borderRadius: R.xl,
+      border: `1px solid ${earned ? `${C.accent.DEFAULT}44` : C.border.DEFAULT}`,
+      backgroundColor: earned ? C.accent.bgSubtle : 'transparent',
+      opacity: earned ? 1 : 0.35,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      textAlign: 'center' as const,
+      gap: SP[2],
+    }}>
+      {/* Icon circle */}
+      <div style={{
+        width: '44px',
+        height: '44px',
+        borderRadius: R.full,
+        backgroundColor: C.card.sunken,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '20px',
+        filter: earned ? 'none' : 'grayscale(1)',
+      }}>
+        {badge.icon}
+      </div>
+
+      {/* Name */}
+      <p style={{
+        fontSize: TY.fontSize.xs,
+        fontWeight: TY.fontWeight.semibold,
+        color: C.text.primary,
+        margin: 0,
+        lineHeight: TY.lineHeight.snug,
+      }}>
+        {badge.name}
+      </p>
+
+      {/* Description */}
+      <p style={{
+        fontSize: TY.fontSize['2xs'],
+        color: C.text.secondary,
+        margin: 0,
+        lineHeight: TY.lineHeight.normal,
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical' as const,
+        overflow: 'hidden',
+      }}>
+        {badge.description}
+      </p>
+
+      {/* Sprint earned label */}
+      {earned && sprintName && (
+        <p style={{
+          fontSize: TY.fontSize['2xs'],
+          color: C.text.disabled,
+          margin: 0,
+        }}>
+          {sprintName}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function AchievementsSection({
+  badges, earnedBadgeKeys, sprints, userBadges,
+  C, TY, SP, R,
+}: {
+  badges: Badge[]
+  earnedBadgeKeys: Set<string>
+  sprints: any[]
+  userBadges: any[]
+  C: any; TY: any; SP: any; R: any
+}) {
+  return (
+    <div style={{
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R['2xl'],
+      padding: SP[5],
+      marginBottom: SP[5],
+    }}>
+      {/* Section header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: SP[4],
+      }}>
+        <h2 style={{
+          fontSize: TY.fontSize.base,
+          fontWeight: TY.fontWeight.semibold,
+          color: C.text.primary,
+          margin: 0,
+        }}>
+          Achievements
+        </h2>
+        <span style={{
+          fontSize: TY.fontSize.xs,
+          color: C.accent.DEFAULT,
+          cursor: 'pointer',
+        }}>
+          View All →
+        </span>
+      </div>
+
+      {/* 4-column grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: SP[3],
+      }}>
+        {badges.map(badge => {
+          const earned = earnedBadgeKeys.has(badge.key)
+          const earnedBadge = userBadges.find((b: any) => b.badgeKey === badge.key)
+          const sprint = earnedBadge ? sprints.find((s: any) => s.id === earnedBadge.sprintId) : null
+          return (
+            <AchievementCard
+              key={badge.key}
+              badge={badge}
+              earned={earned}
+              sprintName={sprint?.name}
+              C={C} TY={TY} SP={SP} R={R}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+```
+
+Update `ProfilePage` return to include the achievements section:
+
+```tsx
+      {/* after stats row div */}
+      <AchievementsSection
+        badges={BADGES}
+        earnedBadgeKeys={earnedBadgeKeys}
+        sprints={sprints}
+        userBadges={badges}
+        C={C} TY={TY} SP={SP} R={R}
+      />
+```
+
+- [ ] **Step 2: Verify achievements grid**
+
+Expected:
+- 4-column grid, 2 rows (8 badges total)
+- Earned badges: accent border, subtle accent bg, full-color emoji
+- Locked badges: dim border, 35% opacity, grayscale emoji
+- Sprint name shown on earned badges when available
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/app/\(app\)/profile/\[id\]/page.tsx
+git commit -m "feat(profile): achievements grid with locked/unlocked states"
+```
+
+---
+
+## Task 5: Sprint History Section
+
+**Files:**
+- Modify: `src/app/(app)/profile/[id]/page.tsx`
+
+- [ ] **Step 1: Add `HistoryRow` and `SprintHistorySection` helpers**
+
+Add these at the bottom of the file:
+
+```tsx
+function HistoryRow({
+  result, sprintName, isLast,
+  C, TY, SP, R,
+}: {
+  result: SprintResult
+  sprintName: string
+  isLast: boolean
+  C: any; TY: any; SP: any; R: any
+}) {
+  const medal =
+    result.rank === 1 ? '🥇'
+    : result.rank === 2 ? '🥈'
+    : result.rank === 3 ? '🥉'
+    : null
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: SP[4],
+      padding: `${SP[3]} 0`,
+      borderBottom: isLast ? 'none' : `1px solid ${C.border.subtle}`,
+    }}>
+      {/* Rank */}
+      <div style={{
+        width: '32px',
+        textAlign: 'center' as const,
+        fontSize: medal ? '18px' : TY.fontSize.sm,
+        fontWeight: TY.fontWeight.bold,
+        color: medal ? undefined : C.text.disabled,
+        flexShrink: 0,
+      }}>
+        {medal ?? `#${result.rank}`}
+      </div>
+
+      {/* Sprint name + sub-line */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          fontSize: TY.fontSize.sm,
+          color: C.text.primary,
+          margin: `0 0 ${SP[0.5]} 0`,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap' as const,
+        }}>
+          {sprintName}
+        </p>
+        <p style={{
+          fontSize: TY.fontSize.xs,
+          color: C.text.disabled,
+          margin: 0,
+        }}>
+          {result.storiesCompleted} stories · {Math.round(result.onTimeRate * 100)}% on time
+        </p>
+      </div>
+
+      {/* Points chip */}
+      <div style={{
+        padding: `${SP[1]} ${SP[3]}`,
+        borderRadius: R.md,
+        backgroundColor: C.accent.bgSubtle,
+        color: C.accent.DEFAULT,
+        fontSize: TY.fontSize.sm,
+        fontWeight: TY.fontWeight.bold,
+        flexShrink: 0,
+      }}>
+        {result.pointsScored}pts
+      </div>
+    </div>
+  )
+}
+
+function SprintHistorySection({
+  results, sprints,
+  C, TY, SP, R,
+}: {
+  results: SprintResult[]
+  sprints: Sprint[]
+  C: any; TY: any; SP: any; R: any
+}) {
+  if (results.length === 0) return null
+
+  return (
+    <div style={{
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R['2xl'],
+      padding: SP[5],
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: SP[2],
+        marginBottom: SP[4],
+      }}>
+        <Trophy size={14} color={C.accent.DEFAULT} />
+        <h2 style={{
+          fontSize: TY.fontSize.base,
+          fontWeight: TY.fontWeight.semibold,
+          color: C.text.primary,
+          margin: 0,
+        }}>
+          Sprint History
+        </h2>
+      </div>
+
+      {/* Rows */}
+      <div>
+        {results.map((result, i) => {
+          const sprint = sprints.find(s => s.id === result.sprintId)
+          return (
+            <HistoryRow
+              key={result.id}
+              result={result}
+              sprintName={sprint?.name ?? 'Sprint'}
+              isLast={i === results.length - 1}
+              C={C} TY={TY} SP={SP} R={R}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+```
+
+Update `ProfilePage` return to include sprint history after achievements:
+
+```tsx
+      <SprintHistorySection
+        results={results}
+        sprints={sprints}
+        C={C} TY={TY} SP={SP} R={R}
+      />
+```
+
+- [ ] **Step 2: Verify sprint history**
+
+Expected:
+- Hidden when no results exist
+- Medal emoji for top-3 ranks; `#N` text for others
+- Sprint name + story count / on-time rate sub-line
+- Points chip with accent background on the right
+- Dividers between rows, no divider on last row
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/app/\(app\)/profile/\[id\]/page.tsx
+git commit -m "feat(profile): sprint history section with rank medals and points chips"
+```
+
+---
+
+## Task 6: Full assembly — wire all sections into ProfilePage
+
+**Files:**
+- Modify: `src/app/(app)/profile/[id]/page.tsx`
+
+- [ ] **Step 1: Replace the ProfilePage return with the complete assembled version**
+
+The final `ProfilePage` return block:
+
+```tsx
+  return (
+    <div style={{ padding: SP[6], maxWidth: '860px' }}>
+      <HeroCard
+        user={user}
+        wins={wins}
+        isOwnProfile={isOwnProfile}
+        C={C} TY={TY} SP={SP} R={R} transitions={transitions}
+      />
+
+      <div style={{ display: 'flex', gap: SP[4], flexWrap: 'wrap', marginBottom: SP[5] }}>
+        <StatCard
+          label="Sprints Won"
+          value={wins}
+          subLabel={`${wins} / ${results.length} total`}
+          icon={Trophy}
+          iconColor={C.warning}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="Stories Done"
+          value={totalStories}
+          subLabel="Completed"
+          icon={CheckCircle2}
+          iconColor={C.success}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="Total Points"
+          value={Math.round(totalPoints)}
+          subLabel="XP Gained"
+          icon={Zap}
+          iconColor={C.accent.DEFAULT}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="On-Time Rate"
+          value={`${avgOnTime}%`}
+          subLabel="Precision"
+          icon={Target}
+          iconColor={C.palette.primaryFixedDim}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+      </div>
+
+      <AchievementsSection
+        badges={BADGES}
+        earnedBadgeKeys={earnedBadgeKeys}
+        sprints={sprints}
+        userBadges={badges}
+        C={C} TY={TY} SP={SP} R={R}
+      />
+
+      <SprintHistorySection
+        results={results}
+        sprints={sprints}
+        C={C} TY={TY} SP={SP} R={R}
+      />
+    </div>
+  )
+```
+
+- [ ] **Step 2: End-to-end smoke test**
+
+Run: `npm run dev`
+
+Check all four sections:
+1. Hero card: avatar, role label, name, online + timezone, Edit/Share buttons (own profile only)
+2. Stats row: 4 cards, each with correct icon colour and values
+3. Achievements: 8 cards, earned vs locked visual states correct
+4. Sprint history: renders when results exist, hidden when empty
+
+- [ ] **Step 3: Check TypeScript compiles clean**
+
+Run: `npx tsc --noEmit`
+Expected: no errors.
+
+- [ ] **Step 4: Final commit**
+
+```bash
+git add src/app/\(app\)/profile/\[id\]/page.tsx
+git commit -m "feat(profile): complete ProfileScreen redesign matching design mockup"
+```
+
+---
+
+## Self-Review Checklist
+
+- [x] **Spec coverage:** Hero (role, avatar, status, actions), Stats Row (4 cards, Lucide icons), Achievements (4-col grid, locked/unlocked), Sprint History (medals, chips) — all sections have tasks
+- [x] **No placeholders:** Every step has actual code blocks
+- [x] **Type consistency:** `SprintResult`, `Badge`, `Sprint`, `User` types imported in Task 1 and used consistently through Tasks 2–5
+- [x] **Token consistency:** `C`, `TY`, `SP`, `R`, `transitions` destructured from `useTheme()` in ProfilePage, passed as props to all helpers — matches `team/page.tsx` pattern
+- [x] **Avatar component untouched:** Rectangular hero avatar is inline only; `Avatar` component stays circular for all other usages
