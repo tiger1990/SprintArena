@@ -66,9 +66,9 @@ The Sheet becomes wider (`sm:max-w-3xl`) and its body uses a horizontal flex lay
 
 ### Left Pane
 
-Takes `flex-1`, `overflow-y-auto`, `flex flex-col`.
+Takes `flex-1 flex flex-col h-full` — does **not** scroll itself. Only the body scrolls.
 
-**Header (sticky top)**
+**Header** (`flex-shrink-0` — always pinned at top)
 
 Background `bg-[#13192a]`, border-bottom, padding `px-6 pt-6 pb-5`.
 
@@ -76,7 +76,9 @@ Background `bg-[#13192a]`, border-bottom, padding `px-6 pt-6 pb-5`.
 - Row 2: Title (`text-xl font-bold text-white`)
 - Row 3: Points badge + tag pills (≤3 tags)
 
-**Body** (`px-6 py-5 space-y-6 flex-1`)
+**Body** (`flex-1 overflow-y-auto px-6 py-5 space-y-6`)
+
+This is the **only scrolling region**. With many comments or long acceptance criteria lists, the user scrolls here — header and footer stay pinned.
 
 1. **Description** — `text-sm text-slate-400 leading-relaxed`, only rendered if non-empty
 
@@ -88,12 +90,13 @@ Background `bg-[#13192a]`, border-bottom, padding `px-6 pt-6 pb-5`.
 
 3. **Comments**
    - Section header: "COMMENTS" label + count badge
-   - Comment cards: blocker ones get red border/bg, regular get slate border/bg
+   - Comment cards rendered in full — no truncation, no pagination. All comments scroll within the body.
+   - Blocker comments: red border/bg. Regular: slate border/bg.
    - Each card: commenter avatar + name + relative time, body text
-   - New comment: `<textarea>` placeholder "Leave a comment..." + Post button
-   - No blocker checkbox here — blocker is in the right sidebar
+   - New comment `<textarea>` + Post button rendered **at the bottom of the comments section**, inside the scroll area. Scrolls into view naturally as comments grow.
+   - No blocker checkbox here — blocker is the dedicated button in the right sidebar
 
-**Footer** (sticky bottom, `border-t border-slate-800 bg-[#13192a] px-6 py-4`)
+**Footer** (`flex-shrink-0` — always pinned at bottom, `border-t border-slate-800 bg-[#13192a] px-6 py-4`)
 
 Rendered only when `canMoveNext` (i.e. status is todo/in_progress/review and user has permission):
 
@@ -107,7 +110,7 @@ Full-width `bg-indigo-600 hover:bg-indigo-700` button. Hidden entirely when `sta
 
 ### Right Sidebar
 
-Fixed width `w-64`, `bg-[#0b0f1a]` (slightly darker than left), `border-l border-slate-800`, `flex flex-col`, `p-5`.
+Fixed width `w-64`, `bg-[#0b0f1a]` (slightly darker than left), `border-l border-slate-800`, `flex flex-col overflow-y-auto`, `p-5`. Scrolls independently if future content grows.
 
 Sections are separated by `border-b border-slate-800/60 pb-4 mb-4`.
 
