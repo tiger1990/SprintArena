@@ -1,124 +1,574 @@
 'use client'
 import { useParams } from 'next/navigation'
 import { useAppStore } from '@/store/app.store'
-import { Avatar } from '@/components/shared/Avatar'
+import { useTheme } from '@/hooks/useTheme'
 import { BADGES } from '@/types'
-import { User, Trophy, Target, Star } from 'lucide-react'
-import { EmptyState } from '@/components/shared/EmptyState'
-import { cn } from '@/lib/utils'
+import type { User, SprintResult, Badge, Sprint } from '@/types'
+import {
+  Trophy, CheckCircle2, Zap, Target,
+  MapPin, Share2, Pencil,
+} from 'lucide-react'
 
 export default function ProfilePage() {
+  const { colors: C, typography: TY, spacing: SP, radius: R, transitions } = useTheme()
   const params = useParams()
-  const { users, sprintResults, userBadges, sprints, stories, currentUser } = useAppStore()
+  const { users, sprintResults, userBadges, sprints, currentUser } = useAppStore()
+
   const user = users.find(u => u.id === params.id)
+  if (!user) {
+    return (
+      <div style={{ padding: SP[6], color: C.text.secondary, fontSize: TY.fontSize.sm }}>
+        User not found.
+      </div>
+    )
+  }
 
-  if (!user) return <div className="p-6 text-slate-400">User not found.</div>
-
-  const results = sprintResults.filter(r => r.userId === user.id)
-  const badges = userBadges.filter(b => b.userId === user.id)
-  const wins = results.filter(r => r.isWinner).length
+  const results      = sprintResults.filter(r => r.userId === user.id)
+  const badges       = userBadges.filter(b => b.userId === user.id)
+  const wins         = results.filter(r => r.isWinner).length
   const totalStories = results.reduce((s, r) => s + r.storiesCompleted, 0)
-  const totalPoints = results.reduce((s, r) => s + r.pointsScored, 0)
-  const avgOnTime = results.length > 0
+  const totalPoints  = results.reduce((s, r) => s + r.pointsScored, 0)
+  const avgOnTime    = results.length > 0
     ? Math.round(results.reduce((s, r) => s + r.onTimeRate, 0) / results.length * 100)
     : 0
-
   const earnedBadgeKeys = new Set(badges.map(b => b.badgeKey))
+  const isOwnProfile = user.id === currentUser?.id
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      {/* Profile header */}
-      <div className="bg-[#13192a] border border-slate-800 rounded-2xl p-6 mb-6 flex items-center gap-6 flex-wrap">
-        <Avatar user={user} size="xl" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-white">{user.name}</h1>
-            {user.id === currentUser?.id && (
-              <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">You</span>
-            )}
-          </div>
-          <p className="text-slate-400 text-sm capitalize">{user.role}</p>
-          {wins > 0 && (
-            <p className="text-amber-400 text-sm mt-1">👑 {wins}x Sprint MVP</p>
-          )}
-        </div>
+    <div style={{ padding: SP[6], maxWidth: '860px' }}>
+      <HeroCard
+        user={user}
+        wins={wins}
+        isOwnProfile={isOwnProfile}
+        C={C} TY={TY} SP={SP} R={R} transitions={transitions}
+      />
+
+      <div style={{ display: 'flex', gap: SP[4], flexWrap: 'wrap', marginBottom: SP[5] }}>
+        <StatCard
+          label="Sprints Won"
+          value={wins}
+          subLabel={`${wins} / ${results.length} total`}
+          icon={Trophy}
+          iconColor={C.warning}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="Stories Done"
+          value={totalStories}
+          subLabel="Completed"
+          icon={CheckCircle2}
+          iconColor={C.success}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="Total Points"
+          value={Math.round(totalPoints)}
+          subLabel="XP Gained"
+          icon={Zap}
+          iconColor={C.accent.DEFAULT}
+          C={C} TY={TY} SP={SP} R={R}
+        />
+        <StatCard
+          label="On-Time Rate"
+          value={`${avgOnTime}%`}
+          subLabel="Precision"
+          icon={Target}
+          iconColor={C.palette.primaryFixedDim}
+          C={C} TY={TY} SP={SP} R={R}
+        />
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Sprints Won', value: wins, icon: '👑', color: 'text-amber-400' },
-          { label: 'Stories Done', value: totalStories, icon: '✅', color: 'text-green-400' },
-          { label: 'Total Points', value: Math.round(totalPoints), icon: '⭐', color: 'text-indigo-400' },
-          { label: 'On-Time Rate', value: `${avgOnTime}%`, icon: '⚡', color: 'text-blue-400' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-[#13192a] border border-slate-800 rounded-xl p-4 text-center">
-            <p className="text-2xl mb-1">{stat.icon}</p>
-            <p className={cn('text-xl font-bold', stat.color)}>{stat.value}</p>
-            <p className="text-[10px] text-slate-500">{stat.label}</p>
-          </div>
-        ))}
-      </div>
+      <AchievementsSection
+        badges={BADGES}
+        earnedBadgeKeys={earnedBadgeKeys}
+        sprints={sprints}
+        userBadges={badges}
+        C={C} TY={TY} SP={SP} R={R}
+      />
 
-      {/* Achievements */}
-      <div className="bg-[#13192a] border border-slate-800 rounded-xl p-5 mb-6">
-        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <Star size={14} className="text-amber-400" /> Achievements
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {BADGES.map(badge => {
-            const earned = earnedBadgeKeys.has(badge.key)
-            const earnedBadge = badges.find(b => b.badgeKey === badge.key)
-            const sprint = earnedBadge ? sprints.find(s => s.id === earnedBadge.sprintId) : null
-            return (
-              <div
-                key={badge.key}
-                className={cn(
-                  'p-3 rounded-xl text-center border transition-colors',
-                  earned
-                    ? 'bg-indigo-500/10 border-indigo-500/30'
-                    : 'bg-slate-800/30 border-slate-800 opacity-40'
-                )}
-                title={badge.description}
-              >
-                <p className="text-2xl mb-1">{badge.icon}</p>
-                <p className={cn('text-[11px] font-semibold', earned ? 'text-slate-200' : 'text-slate-500')}>
-                  {badge.name}
-                </p>
-                {earned && sprint && (
-                  <p className="text-[9px] text-slate-500">{sprint.name}</p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <SprintHistorySection
+        results={results}
+        sprints={sprints}
+        C={C} TY={TY} SP={SP} R={R}
+      />
+    </div>
+  )
+}
 
-      {/* Sprint history */}
-      {results.length > 0 && (
-        <div className="bg-[#13192a] border border-slate-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Trophy size={14} className="text-indigo-400" /> Sprint History
-          </h2>
-          <div className="space-y-3">
-            {results.map(result => {
-              const sprint = sprints.find(s => s.id === result.sprintId)
-              return (
-                <div key={result.id} className="flex items-center gap-3 py-2 border-b border-slate-800 last:border-0">
-                  <span className="text-lg w-6 text-center">
-                    {result.rank === 1 ? '🥇' : result.rank === 2 ? '🥈' : result.rank === 3 ? '🥉' : `#${result.rank}`}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-200">{sprint?.name || 'Sprint'}</p>
-                    <p className="text-xs text-slate-500">{result.storiesCompleted} stories · {Math.round(result.onTimeRate * 100)}% on time</p>
-                  </div>
-                  <span className="text-sm font-bold text-indigo-400">{result.pointsScored}pts</span>
-                </div>
-              )
-            })}
-          </div>
+// ─── Hero Card ────────────────────────────────────────────────────────────────
+
+function HeroCard({
+  user, isOwnProfile, C, TY, SP, R, transitions,
+}: {
+  user: User
+  wins: number
+  isOwnProfile: boolean
+  C: any; TY: any; SP: any; R: any; transitions: any
+}) {
+  const roleLabel = user.role === 'admin' ? 'System Administrator' : 'Assignee'
+
+  return (
+    <div style={{
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R['2xl'],
+      padding: SP[6],
+      marginBottom: SP[5],
+      display: 'flex',
+      gap: SP[6],
+      alignItems: 'flex-start',
+      flexWrap: 'wrap',
+    }}>
+      {/* Rectangular hero avatar */}
+      {user.photoUrl ? (
+        <img
+          src={user.photoUrl}
+          alt={user.name}
+          style={{
+            width: '88px',
+            height: '104px',
+            borderRadius: R['2xl'],
+            objectFit: 'cover',
+            flexShrink: 0,
+          }}
+        />
+      ) : (
+        <div style={{
+          width: '88px',
+          height: '104px',
+          borderRadius: R['2xl'],
+          backgroundColor: user.color,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: TY.fontSize['3xl'],
+          fontWeight: TY.fontWeight.bold,
+          color: '#fff',
+          flexShrink: 0,
+          fontFamily: TY.fontFamily.headline,
+        }}>
+          {user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
         </div>
       )}
+
+      {/* Identity block */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Role label */}
+        <p style={{
+          fontSize: TY.fontSize['2xs'],
+          fontWeight: TY.fontWeight.bold,
+          letterSpacing: TY.letterSpacing.wider,
+          textTransform: 'uppercase' as const,
+          color: C.accent.DEFAULT,
+          margin: `0 0 ${SP[1.5]} 0`,
+        }}>
+          {roleLabel}
+        </p>
+
+        {/* Name */}
+        <h1 className="headline-font" style={{
+          fontSize: TY.fontSize['3xl'],
+          fontWeight: TY.fontWeight.bold,
+          color: C.text.primary,
+          letterSpacing: TY.letterSpacing.tight,
+          lineHeight: TY.lineHeight.tight,
+          margin: `0 0 ${SP[3]} 0`,
+        }}>
+          {user.name}
+        </h1>
+
+        {/* Status + location row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: SP[3],
+          flexWrap: 'wrap' as const,
+          marginBottom: SP[4],
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: SP[1.5] }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: R.full,
+              backgroundColor: C.success,
+              boxShadow: `0 0 6px ${C.success}`,
+            }} />
+            <span style={{ fontSize: TY.fontSize.xs, color: C.text.secondary }}>Online</span>
+          </div>
+
+          <span style={{ color: C.border.strong, fontSize: TY.fontSize.xs }}>·</span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: SP[1] }}>
+            <MapPin size={12} color={C.text.secondary} />
+            <span style={{ fontSize: TY.fontSize.xs, color: C.text.secondary }}>
+              {user.timezone}
+            </span>
+          </div>
+        </div>
+
+        {/* Action buttons — own profile only */}
+        {isOwnProfile && (
+          <div style={{ display: 'flex', gap: SP[3], flexWrap: 'wrap' as const }}>
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: SP[2],
+              padding: `${SP[2]} ${SP[4]}`,
+              borderRadius: R.lg,
+              border: `1px solid ${C.border.strong}`,
+              backgroundColor: 'transparent',
+              color: C.text.primary,
+              fontSize: TY.fontSize.sm,
+              fontWeight: TY.fontWeight.semibold,
+              cursor: 'pointer',
+              transition: `all ${transitions.fast}`,
+            }}>
+              <Pencil size={14} />
+              Edit Profile
+            </button>
+
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: SP[2],
+              padding: `${SP[2]} ${SP[4]}`,
+              borderRadius: R.lg,
+              border: `1px solid ${C.accent.DEFAULT}`,
+              backgroundColor: C.accent.bgSubtle,
+              color: C.accent.DEFAULT,
+              fontSize: TY.fontSize.sm,
+              fontWeight: TY.fontWeight.semibold,
+              cursor: 'pointer',
+              transition: `all ${transitions.fast}`,
+            }}>
+              <Share2 size={14} />
+              Share Stats
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, subLabel, icon: Icon, iconColor,
+  C, TY, SP, R,
+}: {
+  label: string
+  value: string | number
+  subLabel: string
+  icon: React.ElementType
+  iconColor: string
+  C: any; TY: any; SP: any; R: any
+}) {
+  return (
+    <div style={{
+      flex: '1 1 160px',
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R.xl,
+      padding: SP[5],
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: SP[3],
+      }}>
+        <span style={{
+          fontSize: TY.fontSize['2xs'],
+          fontWeight: TY.fontWeight.bold,
+          letterSpacing: TY.letterSpacing.wider,
+          textTransform: 'uppercase' as const,
+          color: C.text.disabled,
+        }}>
+          {label}
+        </span>
+        <Icon size={14} color={iconColor} />
+      </div>
+
+      <p className="headline-font" style={{
+        fontSize: TY.fontSize['2xl'],
+        fontWeight: TY.fontWeight.bold,
+        color: C.text.primary,
+        margin: `0 0 ${SP[1]} 0`,
+        lineHeight: 1,
+      }}>
+        {value}
+      </p>
+
+      <p style={{
+        fontSize: TY.fontSize['2xs'],
+        color: C.text.disabled,
+        margin: 0,
+      }}>
+        {subLabel}
+      </p>
+    </div>
+  )
+}
+
+// ─── Achievement Card ─────────────────────────────────────────────────────────
+
+function AchievementCard({
+  badge, earned, sprintName,
+  C, TY, SP, R,
+}: {
+  badge: Badge
+  earned: boolean
+  sprintName?: string
+  C: any; TY: any; SP: any; R: any
+}) {
+  return (
+    <div style={{
+      padding: SP[4],
+      borderRadius: R.xl,
+      border: `1px solid ${earned ? `${C.accent.DEFAULT}44` : C.border.DEFAULT}`,
+      backgroundColor: earned ? C.accent.bgSubtle : 'transparent',
+      opacity: earned ? 1 : 0.35,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      textAlign: 'center' as const,
+      gap: SP[2],
+    }}>
+      <div style={{
+        width: '44px',
+        height: '44px',
+        borderRadius: R.full,
+        backgroundColor: C.card.sunken,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '20px',
+        filter: earned ? 'none' : 'grayscale(1)',
+      }}>
+        {badge.icon}
+      </div>
+
+      <p style={{
+        fontSize: TY.fontSize.xs,
+        fontWeight: TY.fontWeight.semibold,
+        color: C.text.primary,
+        margin: 0,
+        lineHeight: TY.lineHeight.snug,
+      }}>
+        {badge.name}
+      </p>
+
+      <p style={{
+        fontSize: TY.fontSize['2xs'],
+        color: C.text.secondary,
+        margin: 0,
+        lineHeight: TY.lineHeight.normal,
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical' as const,
+        overflow: 'hidden',
+      }}>
+        {badge.description}
+      </p>
+
+      {earned && sprintName && (
+        <p style={{
+          fontSize: TY.fontSize['2xs'],
+          color: C.text.disabled,
+          margin: 0,
+        }}>
+          {sprintName}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── Achievements Section ─────────────────────────────────────────────────────
+
+function AchievementsSection({
+  badges, earnedBadgeKeys, sprints, userBadges,
+  C, TY, SP, R,
+}: {
+  badges: Badge[]
+  earnedBadgeKeys: Set<string>
+  sprints: Sprint[]
+  userBadges: any[]
+  C: any; TY: any; SP: any; R: any
+}) {
+  return (
+    <div style={{
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R['2xl'],
+      padding: SP[5],
+      marginBottom: SP[5],
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: SP[4],
+      }}>
+        <h2 style={{
+          fontSize: TY.fontSize.base,
+          fontWeight: TY.fontWeight.semibold,
+          color: C.text.primary,
+          margin: 0,
+        }}>
+          Achievements
+        </h2>
+        <span style={{
+          fontSize: TY.fontSize.xs,
+          color: C.accent.DEFAULT,
+          cursor: 'pointer',
+        }}>
+          View All →
+        </span>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: SP[3],
+      }}>
+        {badges.map(badge => {
+          const earned = earnedBadgeKeys.has(badge.key)
+          const earnedBadge = userBadges.find((b: any) => b.badgeKey === badge.key)
+          const sprint = earnedBadge ? sprints.find((s: Sprint) => s.id === earnedBadge.sprintId) : null
+          return (
+            <AchievementCard
+              key={badge.key}
+              badge={badge}
+              earned={earned}
+              sprintName={sprint?.name}
+              C={C} TY={TY} SP={SP} R={R}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── History Row ──────────────────────────────────────────────────────────────
+
+function HistoryRow({
+  result, sprintName, isLast,
+  C, TY, SP, R,
+}: {
+  result: SprintResult
+  sprintName: string
+  isLast: boolean
+  C: any; TY: any; SP: any; R: any
+}) {
+  const medal =
+    result.rank === 1 ? '🥇'
+    : result.rank === 2 ? '🥈'
+    : result.rank === 3 ? '🥉'
+    : null
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: SP[4],
+      padding: `${SP[3]} 0`,
+      borderBottom: isLast ? 'none' : `1px solid ${C.border.subtle}`,
+    }}>
+      <div style={{
+        width: '32px',
+        textAlign: 'center' as const,
+        fontSize: medal ? '18px' : TY.fontSize.sm,
+        fontWeight: TY.fontWeight.bold,
+        color: medal ? undefined : C.text.disabled,
+        flexShrink: 0,
+      }}>
+        {medal ?? `#${result.rank}`}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          fontSize: TY.fontSize.sm,
+          color: C.text.primary,
+          margin: `0 0 ${SP[0.5]} 0`,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap' as const,
+        }}>
+          {sprintName}
+        </p>
+        <p style={{
+          fontSize: TY.fontSize.xs,
+          color: C.text.disabled,
+          margin: 0,
+        }}>
+          {result.storiesCompleted} stories · {Math.round(result.onTimeRate * 100)}% on time
+        </p>
+      </div>
+
+      <div style={{
+        padding: `${SP[1]} ${SP[3]}`,
+        borderRadius: R.md,
+        backgroundColor: C.accent.bgSubtle,
+        color: C.accent.DEFAULT,
+        fontSize: TY.fontSize.sm,
+        fontWeight: TY.fontWeight.bold,
+        flexShrink: 0,
+      }}>
+        {result.pointsScored}pts
+      </div>
+    </div>
+  )
+}
+
+// ─── Sprint History Section ───────────────────────────────────────────────────
+
+function SprintHistorySection({
+  results, sprints,
+  C, TY, SP, R,
+}: {
+  results: SprintResult[]
+  sprints: Sprint[]
+  C: any; TY: any; SP: any; R: any
+}) {
+  if (results.length === 0) return null
+
+  return (
+    <div style={{
+      backgroundColor: C.card.DEFAULT,
+      border: `1px solid ${C.border.DEFAULT}`,
+      borderRadius: R['2xl'],
+      padding: SP[5],
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: SP[2],
+        marginBottom: SP[4],
+      }}>
+        <Trophy size={14} color={C.accent.DEFAULT} />
+        <h2 style={{
+          fontSize: TY.fontSize.base,
+          fontWeight: TY.fontWeight.semibold,
+          color: C.text.primary,
+          margin: 0,
+        }}>
+          Sprint History
+        </h2>
+      </div>
+
+      <div>
+        {results.map((result, i) => {
+          const sprint = sprints.find(s => s.id === result.sprintId)
+          return (
+            <HistoryRow
+              key={result.id}
+              result={result}
+              sprintName={sprint?.name ?? 'Sprint'}
+              isLast={i === results.length - 1}
+              C={C} TY={TY} SP={SP} R={R}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
