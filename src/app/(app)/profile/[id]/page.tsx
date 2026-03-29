@@ -35,7 +35,7 @@ export default function ProfilePage() {
   const isOwnProfile = user.id === currentUser?.id
 
   return (
-    <div style={{ padding: SP[6], maxWidth: '860px' }}>
+    <div style={{ padding: SP[6] }}>
       <HeroCard
         user={user}
         wins={wins}
@@ -151,7 +151,7 @@ function HeroCard({
         </div>
       )}
 
-      {/* Identity block */}
+      {/* Identity block — fills remaining space */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Role label */}
         <p style={{
@@ -165,17 +165,63 @@ function HeroCard({
           {roleLabel}
         </p>
 
-        {/* Name */}
-        <h1 className="headline-font" style={{
-          fontSize: TY.fontSize['3xl'],
-          fontWeight: TY.fontWeight.bold,
-          color: C.text.primary,
-          letterSpacing: TY.letterSpacing.tight,
-          lineHeight: TY.lineHeight.tight,
-          margin: `0 0 ${SP[3]} 0`,
+        {/* Name + action buttons row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: SP[4],
+          flexWrap: 'wrap' as const,
+          marginBottom: SP[3],
         }}>
-          {user.name}
-        </h1>
+          <h1 className="headline-font" style={{
+            fontSize: TY.fontSize['3xl'],
+            fontWeight: TY.fontWeight.bold,
+            color: C.text.primary,
+            letterSpacing: TY.letterSpacing.tight,
+            lineHeight: TY.lineHeight.tight,
+            margin: 0,
+          }}>
+            {user.name}
+          </h1>
+
+          {/* Action buttons — right-aligned, own profile only */}
+          {isOwnProfile && (
+            <div style={{ display: 'flex', gap: SP[3], flexShrink: 0 }}>
+              <button style={{
+                display: 'flex', alignItems: 'center', gap: SP[2],
+                padding: `${SP[2]} ${SP[4]}`,
+                borderRadius: R.lg,
+                border: `1px solid ${C.border.strong}`,
+                backgroundColor: 'transparent',
+                color: C.text.primary,
+                fontSize: TY.fontSize.sm,
+                fontWeight: TY.fontWeight.semibold,
+                cursor: 'pointer',
+                transition: `all ${transitions.fast}`,
+              }}>
+                <Pencil size={14} />
+                Edit Profile
+              </button>
+
+              <button style={{
+                display: 'flex', alignItems: 'center', gap: SP[2],
+                padding: `${SP[2]} ${SP[4]}`,
+                borderRadius: R.lg,
+                border: `1px solid ${C.accent.DEFAULT}`,
+                backgroundColor: C.accent.bgSubtle,
+                color: C.accent.DEFAULT,
+                fontSize: TY.fontSize.sm,
+                fontWeight: TY.fontWeight.semibold,
+                cursor: 'pointer',
+                transition: `all ${transitions.fast}`,
+              }}>
+                <Share2 size={14} />
+                Share Stats
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Status + location row */}
         <div style={{
@@ -183,7 +229,6 @@ function HeroCard({
           alignItems: 'center',
           gap: SP[3],
           flexWrap: 'wrap' as const,
-          marginBottom: SP[4],
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: SP[1.5] }}>
             <div style={{
@@ -205,43 +250,6 @@ function HeroCard({
             </span>
           </div>
         </div>
-
-        {/* Action buttons — own profile only */}
-        {isOwnProfile && (
-          <div style={{ display: 'flex', gap: SP[3], flexWrap: 'wrap' as const }}>
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: SP[2],
-              padding: `${SP[2]} ${SP[4]}`,
-              borderRadius: R.lg,
-              border: `1px solid ${C.border.strong}`,
-              backgroundColor: 'transparent',
-              color: C.text.primary,
-              fontSize: TY.fontSize.sm,
-              fontWeight: TY.fontWeight.semibold,
-              cursor: 'pointer',
-              transition: `all ${transitions.fast}`,
-            }}>
-              <Pencil size={14} />
-              Edit Profile
-            </button>
-
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: SP[2],
-              padding: `${SP[2]} ${SP[4]}`,
-              borderRadius: R.lg,
-              border: `1px solid ${C.accent.DEFAULT}`,
-              backgroundColor: C.accent.bgSubtle,
-              color: C.accent.DEFAULT,
-              fontSize: TY.fontSize.sm,
-              fontWeight: TY.fontWeight.semibold,
-              cursor: 'pointer',
-              transition: `all ${transitions.fast}`,
-            }}>
-              <Share2 size={14} />
-              Share Stats
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )
