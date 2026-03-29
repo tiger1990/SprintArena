@@ -24,6 +24,7 @@ export interface StorySlice {
   getSprintStories: (sprintId: string) => Story[]
   getBacklogStories: () => Story[]
   getProposedStories: () => Story[]
+  duplicateStory: (storyId: string) => void
 }
 
 export const createStorySlice: StateCreator<AppStore, [], [], StorySlice> = (set, get) => ({
@@ -234,4 +235,30 @@ export const createStorySlice: StateCreator<AppStore, [], [], StorySlice> = (set
   getSprintStories: (sprintId) => get().stories.filter(s => s.sprintId === sprintId),
   getBacklogStories: () => get().stories.filter(s => s.status === 'backlog' && !s.sprintId),
   getProposedStories: () => get().stories.filter(s => s.status === 'proposed'),
+
+  duplicateStory: (storyId) => {
+    const source = get().stories.find(s => s.id === storyId)
+    const actor  = get().currentUser
+    if (!source || !actor) return
+    const now = new Date().toISOString()
+    const copy: Story = {
+      id:                 generateId(),
+      workspaceId:        source.workspaceId,
+      title:              `${source.title} (copy)`,
+      description:        source.description,
+      status:             'backlog',
+      priority:           source.priority,
+      storyPoints:        source.storyPoints,
+      tags:               [...source.tags],
+      createdBy:          actor.id,
+      sprintId:           undefined,
+      assigneeId:         undefined,
+      acceptanceCriteria: [],
+      comments:           [],
+      orderIndex:         get().stories.length,
+      createdAt:          now,
+      updatedAt:          now,
+    }
+    set(s => ({ stories: [...s.stories, copy] }))
+  },
 })
