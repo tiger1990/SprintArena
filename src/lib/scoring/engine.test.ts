@@ -115,12 +115,12 @@ describe('calculateSprintScores', () => {
   describe('early completion multiplier', () => {
     it('applies 1.25x multiplier when story completed 2+ days early', () => {
       const earlyStory = makeStory({
-        assigneeId: 'dev-1', status: 'done', storyPoints: 4,
+        assigneeId: 'dev-1', status: 'done', storyPoints: 5,
         // Sprint ends 2026-03-14, completed 3 days early = 2026-03-11
         completedAt: '2026-03-11T10:00:00.000Z',
       })
       const lateStory = makeStory({
-        assigneeId: 'dev-2', status: 'done', storyPoints: 4,
+        assigneeId: 'dev-2', status: 'done', storyPoints: 5,
         // Completed on the last day
         completedAt: '2026-03-14T10:00:00.000Z',
       })

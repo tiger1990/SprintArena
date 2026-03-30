@@ -1,29 +1,28 @@
 'use client'
 import type { Story, StoryStatus } from '@/types'
 import { useAppStore } from '@/store/app.store'
+import { useTheme } from '@/hooks/useTheme'
 import { canEditStory, canMarkAcceptanceCriteria, canMoveToDone } from '@/lib/permissions'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { PriorityBadge } from '@/components/shared/PriorityBadge'
-import { PointsBadge } from '@/components/shared/PointsBadge'
 import { Avatar } from '@/components/shared/Avatar'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import {
-  Check, Plus, AlertTriangle, MessageSquare,
-  ChevronRight, X, Share2, Copy,
+  Plus, ChevronRight, X, Share2, Copy,
+  CheckCircle2, Circle, PlayCircle, Eye, Flag, Star, Paperclip,
+  ArrowUp, AlertTriangle,
 } from 'lucide-react'
 import { useState, useRef } from 'react'
-import { cn, formatDate, formatRelativeTime } from '@/lib/utils'
-import { STATUS_LABELS } from '@/types'
+import { cn, formatDate, formatRelativeTime, getInitials } from '@/lib/utils'
+import { STATUS_LABELS, PRIORITY_LABELS } from '@/types'
 import { toast } from 'sonner'
 
-// ─── Status chip styles ───────────────────────────────────────────────────────
+// ─── Status config ────────────────────────────────────────────────────────────
 
-const STATUS_STYLE: Record<string, { bg: string; text: string; dot: string }> = {
-  todo:        { bg: 'bg-slate-700/60',  text: 'text-slate-300',  dot: 'bg-slate-400'  },
-  in_progress: { bg: 'bg-blue-500/15',   text: 'text-blue-400',   dot: 'bg-blue-400'   },
-  review:      { bg: 'bg-amber-500/15',  text: 'text-amber-400',  dot: 'bg-amber-400'  },
-  done:        { bg: 'bg-green-500/15',  text: 'text-green-400',  dot: 'bg-green-400'  },
+const STATUS_ICON: Record<string, React.ReactNode> = {
+  todo:        <Circle        size={12} />,
+  in_progress: <PlayCircle    size={12} />,
+  review:      <Eye           size={12} />,
+  done:        <CheckCircle2  size={12} />,
 }
 
 const NEXT_STATUS: Partial<Record<StoryStatus, StoryStatus>> = {
@@ -47,6 +46,8 @@ export function StoryDetailSheet({
   open: boolean
   onClose: () => void
 }) {
+  const { colors: C, typography: TY, spacing: SP, radius: R, shadows, transitions } = useTheme()
+
   const {
     currentUser, toggleAC, addAC, addComment,
     moveStory, duplicateStory, getUserById, getActiveSprint,
@@ -66,10 +67,18 @@ export function StoryDetailSheet({
   const nextStatus  = NEXT_STATUS[story.status]
   const canMoveNext = !!nextStatus && (story.status !== 'review' || canDone)
 
-  const statusStyle = STATUS_STYLE[story.status] ?? STATUS_STYLE.todo
   const metAC   = story.acceptanceCriteria.filter(ac => ac.isMet).length
   const totalAC = story.acceptanceCriteria.length
   const acPct   = totalAC > 0 ? Math.round((metAC / totalAC) * 100) : 0
+
+  // Priority → theme colors
+  const priorityStyle: Record<string, { bg: string; color: string }> = {
+    low:      { bg: C.successBg,     color: C.success },
+    medium:   { bg: `${C.warning}1A`, color: C.warning },
+    high:     { bg: C.errorBg,       color: C.error   },
+    critical: { bg: `${C.error}26`,  color: C.error   },
+  }
+  const pStyle = priorityStyle[story.priority] ?? priorityStyle.medium
 
   const handleAddAC = () => {
     if (!newAC.trim()) return
@@ -85,11 +94,6 @@ export function StoryDetailSheet({
     setIsBlocker(false)
   }
 
-  const handleFlagBlocker = () => {
-    setIsBlocker(true)
-    setTimeout(() => commentRef.current?.focus(), 50)
-  }
-
   const handleShareTask = () => {
     navigator.clipboard.writeText(`${window.location.origin}/board?story=${story.id}`)
     toast.success('Link copied to clipboard.')
@@ -101,45 +105,138 @@ export function StoryDetailSheet({
     onClose()
   }
 
+  const handleFlagBlocker = () => {
+    const next = !isBlocker
+    setIsBlocker(next)
+    if (next) setTimeout(() => commentRef.current?.focus(), 50)
+  }
+
+  // ─── Shared style fragments ─────────────────────────────────────────────────
+
+  const sectionLabel: React.CSSProperties = {
+    fontSize:      TY.fontSize['2xs'],
+    fontWeight:    TY.fontWeight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: TY.letterSpacing.widest,
+    color:         C.text.secondary,
+  }
+
+  const divider: React.CSSProperties = {
+    borderBottom: `1px solid ${C.border.subtle}`,
+    paddingBottom: SP[4],
+    marginBottom:  SP[4],
+  }
+
   return (
-    <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent className="bg-[#0f1117] border-l border-slate-800 w-full sm:max-w-3xl p-0 overflow-hidden flex flex-col">
-        <div className="flex flex-row h-full overflow-hidden">
+    <Sheet open={open} onOpenChange={isOpen => { if (!isOpen) onClose() }}>
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="p-0 gap-0 sm:!max-w-3xl flex flex-col overflow-hidden border-l-0"
+        style={{ background: C.page }}
+      >
+        {/* Two-pane row */}
+        <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
 
-          {/* ── Left pane ──────────────────────────────────────── */}
-          <div className="flex-1 flex flex-col min-h-0">
+          {/* ══ LEFT PANE ══════════════════════════════════════════════════ */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-            {/* Header — pinned */}
-            <div className="flex-shrink-0 bg-[#13192a] border-b border-slate-800 px-6 pt-6 pb-5">
-              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full',
-                    statusStyle.bg, statusStyle.text,
-                  )}>
-                    <span className={cn('w-1.5 h-1.5 rounded-full', statusStyle.dot)} />
+            {/* ── Header (pinned) ────────────────────────────────────────── */}
+            <div
+              className="flex-shrink-0"
+              style={{
+                background:   C.card.sunken,
+                borderBottom: `1px solid ${C.border.subtle}`,
+                padding:      `${SP[8]} ${SP[10]} ${SP[6]}`,
+              }}
+            >
+              {/* Row 1: badges + close */}
+              <div className="flex items-center justify-between" style={{ marginBottom: SP[5] }}>
+                <div className="flex items-center" style={{ gap: SP[2] }}>
+                  {/* Status badge */}
+                  <span
+                    className="inline-flex items-center"
+                    style={{
+                      gap:           SP[1.5],
+                      padding:       `${SP[1]} ${SP[3]}`,
+                      borderRadius:  R.full,
+                      fontSize:      TY.fontSize['2xs'],
+                      fontWeight:    TY.fontWeight.bold,
+                      textTransform: 'uppercase',
+                      letterSpacing: TY.letterSpacing.widest,
+                      background:    C.card.DEFAULT,
+                      color:         C.accent.DEFAULT,
+                    }}
+                  >
+                    {STATUS_ICON[story.status]}
                     {STATUS_LABELS[story.status]}
                   </span>
-                  <PriorityBadge priority={story.priority} />
+
+                  {/* Priority badge */}
+                  <span
+                    className="inline-flex items-center"
+                    style={{
+                      gap:           SP[1.5],
+                      padding:       `${SP[1]} ${SP[3]}`,
+                      borderRadius:  R.full,
+                      fontSize:      TY.fontSize['2xs'],
+                      fontWeight:    TY.fontWeight.bold,
+                      textTransform: 'uppercase',
+                      letterSpacing: TY.letterSpacing.widest,
+                      background:    pStyle.bg,
+                      color:         pStyle.color,
+                    }}
+                  >
+                    <ArrowUp size={11} strokeWidth={3} />
+                    {PRIORITY_LABELS[story.priority]}
+                  </span>
                 </div>
+
+                {/* Close */}
                 <button
                   onClick={onClose}
-                  className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-800 flex-shrink-0"
+                  style={{ color: C.text.secondary, transition: `color ${transitions.fast}` }}
+                  onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = C.text.primary)}
+                  onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = C.text.secondary)}
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <h2 className="text-xl font-bold text-white leading-snug mb-4">
+              {/* Row 2: title */}
+              <h2
+                className="headline-font"
+                style={{
+                  fontSize:    TY.fontSize.xl,
+                  fontWeight:  TY.fontWeight.bold,
+                  lineHeight:  TY.lineHeight.tight,
+                  color:       C.text.primary,
+                  marginBottom: SP[3],
+                }}
+              >
                 {story.title}
               </h2>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <PointsBadge points={story.storyPoints} />
+              {/* Row 3: points + tags */}
+              <div className="flex items-center flex-wrap" style={{ gap: SP[4] }}>
+                <div className="flex items-center" style={{ gap: SP[1.5] }}>
+                  <Star size={13} style={{ color: C.accent.DEFAULT }} />
+                  <span style={{ fontSize: TY.fontSize.sm, fontWeight: TY.fontWeight.medium, color: C.accent.DEFAULT }}>
+                    {story.storyPoints} pts
+                  </span>
+                </div>
                 {story.tags.slice(0, 3).map(tag => (
                   <span
                     key={tag}
-                    className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700"
+                    style={{
+                      fontSize:      TY.fontSize['2xs'],
+                      fontWeight:    TY.fontWeight.bold,
+                      textTransform: 'uppercase',
+                      padding:       `${SP[0.5]} ${SP[2]}`,
+                      borderRadius:  R.sm,
+                      background:    C.card.DEFAULT,
+                      color:         C.text.secondary,
+                    }}
                   >
                     {tag}
                   </span>
@@ -147,226 +244,400 @@ export function StoryDetailSheet({
               </div>
             </div>
 
-            {/* Body — only this scrolls */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            {/* ── Body (scrolls) ──────────────────────────────────────────── */}
+            <div
+              className="flex-1 overflow-y-auto"
+              style={{ padding: `${SP[6]} ${SP[10]}` }}
+            >
 
               {/* Description */}
               {story.description && (
-                <p className="text-sm text-slate-400 leading-relaxed">
-                  {story.description}
-                </p>
+                <section style={{ marginBottom: SP[8] }}>
+                  <h3 style={{ ...sectionLabel, marginBottom: SP[4] }}>Description</h3>
+                  <p style={{ fontSize: TY.fontSize.sm, lineHeight: TY.lineHeight.relaxed, color: C.text.secondary }}>
+                    {story.description}
+                  </p>
+                </section>
               )}
 
               {/* Acceptance Criteria */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Acceptance Criteria
-                  </h3>
-                  <span className="text-[10px] text-slate-500">
-                    {metAC}/{totalAC}
-                    {totalAC > 0 && (
-                      <span className="ml-1 text-slate-600">({acPct}%)</span>
-                    )}
+              <section style={{ marginBottom: SP[8] }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: SP[4] }}>
+                  <h3 style={sectionLabel}>Acceptance Criteria</h3>
+                  <span style={{ fontSize: TY.fontSize.xs, fontFamily: TY.fontFamily.mono, color: C.accent.DEFAULT }}>
+                    {metAC} / {totalAC} ({acPct}%)
                   </span>
                 </div>
 
+                {/* Progress bar */}
                 {totalAC > 0 && (
-                  <div className="h-1 bg-slate-800 rounded-full overflow-hidden mb-3">
+                  <div
+                    style={{
+                      width: '100%', height: '4px',
+                      borderRadius: R.full,
+                      background: C.card.DEFAULT,
+                      marginBottom: SP[6],
+                    }}
+                  >
                     <div
-                      className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                      style={{ width: `${acPct}%` }}
+                      style={{
+                        height: '100%',
+                        borderRadius: R.full,
+                        background: C.accent.DEFAULT,
+                        width: `${acPct}%`,
+                        transition: `width ${transitions.xSlow}`,
+                      }}
                     />
                   </div>
                 )}
 
-                <div className="space-y-1.5">
+                {/* AC items */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: SP[3] }}>
                   {story.acceptanceCriteria.map(ac => (
-                    <div
+                    <label
                       key={ac.id}
-                      className={cn(
-                        'flex items-start gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                        canAC ? 'cursor-pointer hover:bg-slate-800/60' : '',
-                        ac.isMet ? 'bg-green-500/5' : 'bg-slate-800/30',
-                      )}
-                      onClick={() => canAC && currentUser && toggleAC(story.id, ac.id, currentUser.id)}
+                      className={cn('flex items-start', canAC ? 'cursor-pointer' : 'cursor-default')}
+                      style={{
+                        gap:          SP[4],
+                        padding:      SP[4],
+                        borderRadius: R.lg,
+                        background:   ac.isMet ? C.successBg : C.card.sunken,
+                        border:       `1px solid ${C.border.subtle}`,
+                        transition:   `background ${transitions.fast}`,
+                      }}
+                      onMouseEnter={e => {
+                        if (canAC) (e.currentTarget as HTMLLabelElement).style.background = C.card.DEFAULT
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLLabelElement).style.background = ac.isMet ? C.successBg : C.card.sunken
+                      }}
                     >
-                      <div className={cn(
-                        'w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all',
-                        ac.isMet ? 'bg-green-500 border-green-500' : 'border-slate-600',
-                      )}>
-                        {ac.isMet && <Check size={10} className="text-white" />}
-                      </div>
-                      <span className={cn(
-                        'text-xs leading-relaxed',
-                        ac.isMet ? 'text-slate-500 line-through' : 'text-slate-300',
-                      )}>
+                      <input
+                        type="checkbox"
+                        checked={ac.isMet}
+                        onChange={() => canAC && currentUser && toggleAC(story.id, ac.id, currentUser.id)}
+                        disabled={!canAC}
+                        className="mt-0.5 w-5 h-5 flex-shrink-0 accent-[#cc97ff]"
+                      />
+                      <span
+                        className={cn('leading-snug', ac.isMet && 'line-through')}
+                        style={{
+                          fontSize:   TY.fontSize.sm,
+                          fontWeight: TY.fontWeight.medium,
+                          color:      ac.isMet ? C.text.disabled : C.text.primary,
+                        }}
+                      >
                         {ac.text}
                       </span>
-                    </div>
+                    </label>
                   ))}
                 </div>
 
                 {totalAC === 0 && (
-                  <p className="text-xs text-slate-600 italic px-1">
+                  <p style={{ fontSize: TY.fontSize.xs, fontStyle: 'italic', color: C.text.disabled }}>
                     No acceptance criteria defined.
                   </p>
                 )}
 
+                {/* Add AC */}
                 {canEdit && (
-                  <div className="flex gap-2 mt-3">
+                  <div className="flex" style={{ gap: SP[2], marginTop: SP[4] }}>
                     <input
                       value={newAC}
                       onChange={e => setNewAC(e.target.value)}
                       placeholder="Add acceptance criterion..."
-                      className="flex-1 text-xs bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                      className="flex-1 outline-none"
+                      style={{
+                        fontSize:     TY.fontSize.xs,
+                        padding:      `${SP[2]} ${SP[3]}`,
+                        borderRadius: R.DEFAULT,
+                        background:   C.input.bg,
+                        border:       `1px solid ${C.border.DEFAULT}`,
+                        color:        C.input.text,
+                        transition:   `border-color ${transitions.fast}`,
+                      }}
+                      onFocus={e => ((e.currentTarget as HTMLInputElement).style.borderColor = C.accent.DEFAULT)}
+                      onBlur={e => ((e.currentTarget as HTMLInputElement).style.borderColor = C.border.DEFAULT)}
                       onKeyDown={e => e.key === 'Enter' && handleAddAC()}
                     />
                     <button
                       onClick={handleAddAC}
-                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                      style={{
+                        padding:      `${SP[2]} ${SP[3]}`,
+                        borderRadius: R.DEFAULT,
+                        background:   C.accent.DEFAULT,
+                        color:        C.accent.on,
+                        transition:   `background ${transitions.fast}`,
+                      }}
+                      onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = C.accent.dim)}
+                      onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = C.accent.DEFAULT)}
                     >
                       <Plus size={14} />
                     </button>
                   </div>
                 )}
-              </div>
+              </section>
 
               {/* Comments */}
-              <div>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <MessageSquare size={11} />
-                  Comments
+              <section>
+                <div className="flex items-center" style={{ gap: SP[2], marginBottom: SP[6] }}>
+                  <h3 style={sectionLabel}>Comments</h3>
                   {story.comments.length > 0 && (
-                    <span className="ml-1 bg-slate-800 text-slate-500 text-[10px] px-1.5 py-0.5 rounded-full">
+                    <span
+                      style={{
+                        fontSize:     TY.fontSize['2xs'],
+                        fontWeight:   TY.fontWeight.bold,
+                        padding:      `${SP[0.5]} ${SP[1.5]}`,
+                        borderRadius: R.sm,
+                        background:   C.card.DEFAULT,
+                        color:        C.accent.DEFAULT,
+                      }}
+                    >
                       {story.comments.length}
                     </span>
                   )}
-                </h3>
+                </div>
 
-                {story.comments.length > 0 && (
-                  <div className="space-y-2.5 mb-4">
-                    {story.comments.map(comment => {
-                      const commenter = getUserById(comment.userId)
-                      return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: SP[6] }}>
+                  {/* Existing comments */}
+                  {story.comments.map(comment => {
+                    const commenter = getUserById(comment.userId)
+                    return (
+                      <div key={comment.id} className="flex items-start" style={{ gap: SP[4] }}>
+                        {commenter && (
+                          <Avatar
+                            user={commenter}
+                            size="sm"
+                            className="flex-shrink-0"
+                            style={{ border: `2px solid ${C.avatar.ring}` }}
+                          />
+                        )}
                         <div
-                          key={comment.id}
-                          className={cn(
-                            'p-3 rounded-xl border',
-                            comment.isBlocker
-                              ? 'bg-red-500/8 border-red-500/25'
-                              : 'bg-slate-800/40 border-slate-800',
-                          )}
+                          className="flex-1"
+                          style={{
+                            padding:      SP[4],
+                            borderRadius: R.xl,
+                            background:   comment.isBlocker ? C.errorBg : C.card.DEFAULT,
+                            border:       `1px solid ${comment.isBlocker ? `${C.error}40` : C.border.subtle}`,
+                          }}
                         >
                           {comment.isBlocker && (
-                            <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-bold mb-2 uppercase tracking-wider">
+                            <div
+                              className="flex items-center"
+                              style={{
+                                gap:           SP[1.5],
+                                marginBottom:  SP[2],
+                                textTransform: 'uppercase',
+                                letterSpacing: TY.letterSpacing.wider,
+                                fontSize:      TY.fontSize['2xs'],
+                                fontWeight:    TY.fontWeight.bold,
+                                color:         C.error,
+                              }}
+                            >
                               <AlertTriangle size={10} /> Blocker
                             </div>
                           )}
-                          <div className="flex items-center gap-2 mb-1.5">
-                            {commenter && <Avatar user={commenter} size="xs" />}
-                            <span className="text-[11px] font-semibold text-slate-300">
+                          <div className="flex items-center justify-between" style={{ marginBottom: SP[1.5] }}>
+                            <span style={{ fontSize: TY.fontSize.xs, fontWeight: TY.fontWeight.bold, color: C.text.primary }}>
                               {commenter?.name}
                             </span>
-                            <span className="text-[10px] text-slate-600 ml-auto">
+                            <span style={{ fontSize: TY.fontSize['2xs'], color: C.text.secondary }}>
                               {formatRelativeTime(comment.createdAt)}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-300 leading-relaxed">
+                          <p style={{ fontSize: TY.fontSize.sm, lineHeight: TY.lineHeight.relaxed, color: C.text.secondary }}>
                             {comment.body}
                           </p>
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
+                      </div>
+                    )
+                  })}
 
-                {/* New comment — inside scroll area, always reachable */}
-                <div className="space-y-2">
-                  <Textarea
-                    ref={commentRef}
-                    value={newComment}
-                    onChange={e => setNewComment(e.target.value)}
-                    placeholder="Leave a comment..."
-                    className={cn(
-                      'bg-slate-800/60 border-slate-700 text-sm resize-none placeholder:text-slate-600 focus:border-indigo-500',
-                      isBlocker && 'border-red-500/50 focus:border-red-500',
-                    )}
-                    rows={2}
-                  />
-                  <div className="flex items-center justify-end">
-                    <Button
-                      size="sm"
-                      onClick={handleAddComment}
-                      disabled={!newComment.trim()}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-xs px-4"
+                  {/* New comment input */}
+                  <div className="flex items-start" style={{ gap: SP[4] }}>
+                    {/* Current user avatar */}
+                    <div
+                      className="flex-shrink-0 flex items-center justify-center"
+                      style={{
+                        width:        SP[8],
+                        height:       SP[8],
+                        borderRadius: R.full,
+                        background:   C.accent.DEFAULT,
+                      }}
                     >
-                      {isBlocker ? '🚨 Post Blocker' : 'Post'}
-                    </Button>
+                      <span style={{ fontSize: TY.fontSize['2xs'], fontWeight: TY.fontWeight.bold, color: C.accent.on }}>
+                        {currentUser ? getInitials(currentUser.name) : 'ME'}
+                      </span>
+                    </div>
+
+                    <div className="flex-1 relative">
+                      <textarea
+                        ref={commentRef}
+                        value={newComment}
+                        onChange={e => setNewComment(e.target.value)}
+                        placeholder="Leave a comment..."
+                        rows={3}
+                        className="w-full resize-none outline-none"
+                        style={{
+                          padding:      `${SP[4]} ${SP[4]} ${SP[14]} ${SP[4]}`,
+                          fontSize:     TY.fontSize.sm,
+                          borderRadius: R.xl,
+                          background:   C.input.bg,
+                          border:       `1px solid ${isBlocker ? `${C.error}59` : C.border.DEFAULT}`,
+                          color:        C.input.text,
+                          transition:   `border-color ${transitions.fast}, box-shadow ${transitions.fast}`,
+                        }}
+                        onFocus={e => {
+                          (e.currentTarget as HTMLTextAreaElement).style.boxShadow = shadows.inputFocus
+                        }}
+                        onBlur={e => {
+                          (e.currentTarget as HTMLTextAreaElement).style.boxShadow = 'none'
+                        }}
+                      />
+                      <div
+                        className="absolute flex items-center"
+                        style={{ bottom: SP[3], right: SP[3], gap: SP[3] }}
+                      >
+                        <button
+                          type="button"
+                          style={{ color: C.text.disabled, transition: `color ${transitions.fast}` }}
+                          onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = C.accent.DEFAULT)}
+                          onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = C.text.disabled)}
+                          onClick={() => {}}
+                        >
+                          <Paperclip size={17} />
+                        </button>
+                        <button
+                          onClick={handleAddComment}
+                          disabled={!newComment.trim()}
+                          type="button"
+                          className="whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+                          style={{
+                            padding:      `${SP[2]} ${SP[5]}`,
+                            borderRadius: R.lg,
+                            fontSize:     TY.fontSize.xs,
+                            fontWeight:   TY.fontWeight.bold,
+                            background:   C.accent.DEFAULT,
+                            color:        C.accent.on,
+                            transition:   `background ${transitions.fast}`,
+                          }}
+                          onMouseEnter={e => {
+                            if (!(e.currentTarget as HTMLButtonElement).disabled)
+                              (e.currentTarget as HTMLButtonElement).style.background = C.accent.fixedDim
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.background = C.accent.DEFAULT
+                          }}
+                        >
+                          {isBlocker ? '🚨 Post Blocker' : 'Post'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </section>
 
-            {/* Footer — pinned, only for non-done stories */}
+            </div>{/* /body */}
+
+            {/* ── Footer (pinned) ─────────────────────────────────────────── */}
             {canMoveNext && nextStatus && (
-              <div className="flex-shrink-0 border-t border-slate-800 bg-[#13192a] px-6 py-4">
+              <div
+                className="flex-shrink-0"
+                style={{
+                  padding:     `${SP[4]} ${SP[10]}`,
+                  borderTop:   `1px solid ${C.border.subtle}`,
+                  background:  C.card.sunken,
+                }}
+              >
                 <Button
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 h-10 font-semibold"
+                  className="w-full font-bold rounded-xl"
+                  style={{
+                    height:     SP[11],
+                    background: C.accent.DEFAULT,
+                    color:      C.accent.on,
+                  }}
                   onClick={() => {
                     if (currentUser) moveStory(story.id, nextStatus, currentUser.id)
                     onClose()
                   }}
                 >
                   {NEXT_LABEL[story.status] ?? `Move to ${STATUS_LABELS[nextStatus]}`}
-                  <ChevronRight size={16} className="ml-1.5" />
+                  <ChevronRight size={16} className="ml-1" />
                 </Button>
               </div>
             )}
-          </div>
 
-          {/* ── Right sidebar ───────────────────────────────────── */}
-          <div className="w-64 bg-[#0b0f1a] border-l border-slate-800 flex flex-col overflow-y-auto p-5 flex-shrink-0">
+          </div>{/* /left pane */}
+
+          {/* ══ RIGHT SIDEBAR ══════════════════════════════════════════════ */}
+          <div
+            className="w-64 flex-shrink-0 flex flex-col overflow-y-auto"
+            style={{
+              background:  C.pageDim,
+              borderLeft:  `1px solid ${C.border.subtle}`,
+              padding:     SP[5],
+            }}
+          >
 
             {/* Assigned */}
-            <div className="pb-4 mb-4 border-b border-slate-800/60">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">
-                Assigned
-              </p>
+            <div style={divider}>
+              <p style={{ ...sectionLabel, marginBottom: SP[3] }}>Assigned</p>
               {assignee ? (
-                <div className="flex items-center gap-3">
-                  <Avatar user={assignee} size="md" />
+                <div
+                  className="flex items-center"
+                  style={{
+                    gap:          SP[3],
+                    padding:      SP[3],
+                    borderRadius: R.xl,
+                    background:   C.card.DEFAULT,
+                    border:       `1px solid ${C.border.subtle}`,
+                  }}
+                >
+                  <div
+                    className="flex-shrink-0"
+                    style={{
+                      borderRadius: R.full,
+                      padding:      '2px',
+                      background:   `linear-gradient(135deg, ${C.avatar.gradientFrom}B3, ${C.avatar.gradientTo}80)`,
+                    }}
+                  >
+                    <Avatar user={assignee} size="md" className="ring-0 block" />
+                  </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-200 truncate">
+                    <p
+                      className="truncate"
+                      style={{ fontSize: TY.fontSize.sm, fontWeight: TY.fontWeight.bold, color: C.text.primary }}
+                    >
                       {assignee.name}
                     </p>
-                    <p className="text-xs text-slate-500 capitalize">
+                    <p
+                      className="capitalize"
+                      style={{ fontSize: TY.fontSize['2xs'], color: C.text.secondary, marginTop: SP[0.5] }}
+                    >
                       {assignee.role}
                     </p>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-slate-600 italic">Unassigned</p>
+                <p style={{ fontSize: TY.fontSize.xs, fontStyle: 'italic', color: C.text.disabled }}>Unassigned</p>
               )}
             </div>
 
             {/* Dates */}
-            <div className="pb-4 mb-4 border-b border-slate-800/60">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">
-                Dates
-              </p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-500">Created</span>
-                  <span className="text-xs font-semibold text-slate-200">
+            <div style={divider}>
+              <p style={{ ...sectionLabel, marginBottom: SP[3] }}>Dates</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: SP[3] }}>
+                <div className="flex items-center justify-between">
+                  <span style={{ fontSize: TY.fontSize.xs, color: C.text.secondary }}>Created</span>
+                  <span style={{ fontSize: TY.fontSize.xs, fontFamily: TY.fontFamily.mono, fontWeight: TY.fontWeight.semibold, color: C.text.primary }}>
                     {formatDate(story.createdAt)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-500 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <span style={{ fontSize: TY.fontSize.xs, color: C.text.secondary }}>
                     {story.status === 'done' ? 'Completed' : 'Due Date'}
                   </span>
-                  <span className="text-xs font-semibold text-slate-200 text-right">
+                  <span style={{ fontSize: TY.fontSize.xs, fontFamily: TY.fontFamily.mono, fontWeight: TY.fontWeight.semibold, color: C.error }}>
                     {story.status === 'done'
                       ? (story.completedAt ? formatDate(story.completedAt) : '—')
                       : (sprint ? formatDate(sprint.endDate) : '—')
@@ -376,39 +647,72 @@ export function StoryDetailSheet({
               </div>
             </div>
 
-            {/* Flag as Blocker — hidden for done stories */}
+            {/* Flag as Blocker — hidden when done */}
             {story.status !== 'done' && (
-              <div className="pb-4 mb-4 border-b border-slate-800/60">
+              <div style={divider}>
                 <button
                   onClick={handleFlagBlocker}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-red-500/40 bg-red-500/[0.08] text-red-400 text-sm font-semibold hover:bg-red-500/15 transition-colors"
+                  className="w-full flex items-center text-left"
+                  style={{
+                    gap:          SP[3],
+                    padding:      SP[4],
+                    borderRadius: R.xl,
+                    background:   isBlocker ? `${C.error}1F` : C.errorBg,
+                    border:       `1px solid ${isBlocker ? `${C.error}66` : `${C.error}26`}`,
+                    transition:   `background ${transitions.fast}, border-color ${transitions.fast}`,
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = `${C.error}1A`
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = isBlocker ? `${C.error}1F` : C.errorBg
+                  }}
                 >
-                  <AlertTriangle size={14} />
-                  Flag as Blocker
+                  <Flag size={14} style={{ color: C.error, flexShrink: 0 }} />
+                  <span style={{ fontSize: TY.fontSize.xs, fontWeight: TY.fontWeight.bold, textTransform: 'uppercase', letterSpacing: TY.letterSpacing.wider, color: C.error }}>
+                    {isBlocker ? 'Blocker Flagged' : 'Flag as Blocker'}
+                  </span>
                 </button>
               </div>
             )}
 
             {/* Share + Duplicate — done stories only */}
             {story.status === 'done' && (
-              <div className="mt-auto flex flex-col gap-1">
-                <button
-                  onClick={handleShareTask}
-                  className="w-full flex items-center gap-2 py-2 px-3 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
-                >
-                  <Share2 size={14} />
-                  Share Task
-                </button>
-                <button
-                  onClick={handleDuplicate}
-                  className="w-full flex items-center gap-2 py-2 px-3 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
-                >
-                  <Copy size={14} />
-                  Duplicate
-                </button>
+              <div className="mt-auto" style={{ display: 'flex', flexDirection: 'column', gap: SP[1] }}>
+                {[
+                  { icon: <Share2 size={14} />, label: 'Share Task',  onClick: handleShareTask },
+                  { icon: <Copy   size={14} />, label: 'Duplicate',   onClick: handleDuplicate },
+                ].map(({ icon, label, onClick }) => (
+                  <button
+                    key={label}
+                    onClick={onClick}
+                    className="w-full flex items-center text-left"
+                    style={{
+                      gap:          SP[2],
+                      padding:      `${SP[2]} ${SP[3]}`,
+                      borderRadius: R.lg,
+                      fontSize:     TY.fontSize.sm,
+                      color:        C.text.secondary,
+                      background:   'transparent',
+                      transition:   `color ${transitions.fast}, background ${transitions.fast}`,
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLButtonElement).style.color = C.text.primary
+                      ;(e.currentTarget as HTMLButtonElement).style.background = C.border.subtle
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.color = C.text.secondary
+                      ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                    }}
+                  >
+                    {icon}
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
-          </div>
+
+          </div>{/* /right sidebar */}
 
         </div>
       </SheetContent>

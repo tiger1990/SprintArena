@@ -247,7 +247,7 @@ export function Sidebar() {
       >
         <Avatar user={currentUser} size="sm" />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: TY.fontSize.xs, fontWeight: TY.fontWeight.semibold, color: C.text.primary, truncate: true }}>
+          <p style={{ fontSize: TY.fontSize.xs, fontWeight: TY.fontWeight.semibold, color: C.text.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {currentUser.name}
           </p>
           <p style={{ fontSize: TY.fontSize['2xs'], color: C.text.secondary, textTransform: 'capitalize' }}>
