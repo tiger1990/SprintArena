@@ -50,3 +50,7 @@ Rate limiter in-memory limitation — Current implementation works for a single 
 
 Pixel 5 (mobile) Playwright project — Tests currently only run on Chromium. The playwright.config.ts may have a Pixel 5 project defined; it hasn't been run in this session.
 
+<img width="525" height="435" alt="Screenshot 2026-05-20 at 6 03 35 PM" src="https://github.com/user-attachments/assets/0dbed282-c305-4a51-a465-8c141c840787" />
+<img width="528" height="382" alt="Screenshot 2026-05-20 at 6 03 13 PM" src="https://github.com/user-attachments/assets/6d3c5990-6c01-459b-9ea5-798aa2e56f84" />
+
+
